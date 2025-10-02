@@ -111,7 +111,7 @@ resource "aws_eks_node_group" "main" {
   subnet_ids = [aws_subnet.private_1.id]
 
   # MÁXIMA ECONOMIA
-  instance_types = ["t3.micro"] # Menor possível que ainda funciona (2 vCPU, 1GB RAM)
+  instance_types = ["t3.small"] # Menor possível que ainda funciona (2 vCPU, 1GB RAM)
   capacity_type  = "SPOT"       # 70% mais barato que On-Demand
 
   scaling_config {
