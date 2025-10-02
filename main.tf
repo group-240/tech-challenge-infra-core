@@ -13,10 +13,10 @@ terraform {
 
   # Backend S3 específico para sua conta AWS (891377164819)
   backend "s3" {
-    bucket         = "tech-challenge-tfstate-891377164819"
+    bucket         = "tech-challenge-tfstate-533267363894-2"
     key            = "core/terraform.tfstate"
     region         = "us-east-1"
-    dynamodb_table = "tech-challenge-terraform-lock-891377164819"
+    dynamodb_table = "tech-challenge-terraform-lock-533267363894-2"
     encrypt        = true
   }
 }
@@ -202,13 +202,8 @@ resource "aws_eks_node_group" "main" {
   subnet_ids = [aws_subnet.private_1.id]
 
   # MÁXIMA ECONOMIA
-<<<<<<< HEAD
   instance_types = ["t3.small"] # Menor possível que ainda funciona (2 vCPU, 2GB RAM)
   capacity_type  = "SPOT"       # 70% mais barato que On-Demand
-=======
-  instance_types = ["t3.small"] # Menor possível que ainda funciona (2 vCPU, 1GB RAM)
-  capacity_type  = "ON_DEMAND"       # 70% mais barato que On-Demand
->>>>>>> 9243859a60c3c7d53dcff6e69748c4ac03be2551
 
   scaling_config {
     desired_size = 1 # APENAS 1 node
