@@ -112,7 +112,7 @@ resource "aws_eks_node_group" "main" {
 
   # MÁXIMA ECONOMIA
   instance_types = ["t3.small"] # Menor possível que ainda funciona (2 vCPU, 1GB RAM)
-  capacity_type  = "SPOT"       # 70% mais barato que On-Demand
+  capacity_type  = "ON_DEMAND"       # 70% mais barato que On-Demand
 
   scaling_config {
     desired_size = 1 # APENAS 1 node
