@@ -13,10 +13,10 @@ terraform {
 
   # Backend S3 específico para sua conta AWS (533267363894)
   backend "s3" {
-    bucket         = "tech-challenge-tfstate-533267363894-1"
+    bucket         = "tech-challenge-tfstate-533267363894-2"
     key            = "core/terraform.tfstate"
     region         = "us-east-1"
-    dynamodb_table = "tech-challenge-terraform-lock-533267363894-1"
+    dynamodb_table = "tech-challenge-terraform-lock-533267363894-2"
     encrypt        = true
   }
 }
