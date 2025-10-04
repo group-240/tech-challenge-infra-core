@@ -335,6 +335,59 @@ resource "aws_cognito_user_pool_domain" "main" {
 }
 
 # ------------------------------------------------------------------
+# ECR Repository (para imagens Docker da aplicação)
+# ------------------------------------------------------------------
+resource "aws_ecr_repository" "app" {
+  name = "${var.project_name}-api"
+
+  image_tag_mutability = "MUTABLE"
+
+  image_scanning_configuration {
+    scan_on_push = false # Desabilitado para economizar custos
+  }
+
+  tags = merge(local.common_tags, {
+    Name = "${var.project_name}-ecr-repository"
+  })
+}
+
+# Lifecycle policy para limpar imagens antigas (economia de custo)
+resource "aws_ecr_lifecycle_policy" "app" {
+  repository = aws_ecr_repository.app.name
+
+  policy = jsonencode({
+    rules = [
+      {
+        rulePriority = 1
+        description  = "Keep only last 10 images"
+        selection = {
+          tagStatus     = "tagged"
+          tagPrefixList = ["latest"]
+          countType     = "imageCountMoreThan"
+          countNumber   = 10
+        }
+        action = {
+          type = "expire"
+        }
+      },
+      {
+        rulePriority = 2
+        description  = "Delete untagged images older than 1 day"
+        selection = {
+          tagStatus   = "untagged"
+          countType   = "sinceImagePushed"
+          countUnit   = "days"
+          countNumber = 1
+        }
+        action = {
+          type = "expire"
+        }
+      }
+    ]
+  })
+}
+
+# ------------------------------------------------------------------
 # Network Load Balancer (NLB) - Infraestrutura compartilhada
 # ------------------------------------------------------------------
 

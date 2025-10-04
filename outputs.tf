@@ -102,6 +102,17 @@ output "target_group_arn" {
   value       = aws_lb_target_group.app.arn
 }
 
+# ECR Repository outputs
+output "ecr_repository_url" {
+  description = "URL do repositório ECR"
+  value       = aws_ecr_repository.app.repository_url
+}
+
+output "ecr_repository_name" {
+  description = "Nome do repositório ECR"
+  value       = aws_ecr_repository.app.name
+}
+
 output "account_info" {
   description = "Informações da conta AWS"
   value = {
