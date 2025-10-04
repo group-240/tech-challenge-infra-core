@@ -1,31 +1,5 @@
 # Validação de Workflows - Deploy AWS Tech Challenge
 
-## ✅ Status dos Workflows Validados
-
-### 📋 **Resumo das Correções Implementadas**
-
-1. **✅ Workflow S3 Bootstrap movido corretamente**
-   - ❌ **Problema**: Workflow estava em `tech-challenge-application`
-   - ✅ **Solução**: Movido para `tech-challenge-infra-core`
-   - ✅ **Ação**: Deletado do application, criado no infra-core
-
-2. **✅ Account ID corrigido no Bootstrap**
-   - ❌ **Problema**: Account ID incorreto `891377164819`
-   - ✅ **Solução**: Corrigido para `533267363894`
-   - ✅ **Bucket**: `tech-challenge-tfstate-533267363894-4`
-
-3. **✅ Nome do Cluster EKS corrigido**
-   - ❌ **Problema**: Workflow usava `tech-challenge-cluster`
-   - ✅ **Solução**: Corrigido para `tech-challenge-eks`
-   - ✅ **Infra**: Cluster definido como `${var.project_name}-eks`
-
-4. **✅ ECR Repository criado**
-   - ❌ **Problema**: ECR não existia na infraestrutura
-   - ✅ **Solução**: Adicionado ao `infra-core` com lifecycle policy
-   - ✅ **Nome**: `tech-challenge-api`
-
----
-
 ## 🏗️ **Workflows por Repositório**
 
 ### 1. **tech-challenge-infra-core**
