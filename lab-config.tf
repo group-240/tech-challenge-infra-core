@@ -1,10 +1,10 @@
 # ------------------------------------------------------------------
-# AWS Learner Lab - Conta 891377164819 - us-east-1
+# AWS Learner Lab - Conta 533267363894 - us-east-1
 # ------------------------------------------------------------------
 
 locals {
   # Configurações fixas da sua conta
-  aws_account_id = "891377164819"
+  aws_account_id = "533267363894"
   aws_region     = "us-east-1"
   
   # Role específico do Learner Lab

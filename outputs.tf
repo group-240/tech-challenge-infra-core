@@ -38,6 +38,70 @@ output "eks_node_group_arn" {
   value       = aws_eks_node_group.main.arn
 }
 
+output "eks_cluster_name" {
+  description = "Nome do cluster EKS"
+  value       = aws_eks_cluster.main.name
+}
+
+output "public_subnet_id" {
+  description = "ID da subnet pública"
+  value       = aws_subnet.public.id
+}
+
+output "nat_gateway_id" {
+  description = "ID do NAT Gateway"
+  value       = aws_nat_gateway.main.id
+}
+
+output "internet_gateway_id" {
+  description = "ID do Internet Gateway"
+  value       = aws_internet_gateway.main.id
+}
+
+output "cognito_user_pool_id" {
+  description = "ID do Cognito User Pool"
+  value       = aws_cognito_user_pool.main.id
+}
+
+output "cognito_user_pool_client_id" {
+  description = "ID do Cognito User Pool Client"
+  value       = aws_cognito_user_pool_client.main.id
+}
+
+output "cognito_user_pool_arn" {
+  description = "ARN do Cognito User Pool"
+  value       = aws_cognito_user_pool.main.arn
+}
+
+output "cognito_user_pool_endpoint" {
+  description = "Endpoint do Cognito User Pool"
+  value       = aws_cognito_user_pool.main.endpoint
+}
+
+# ------------------------------------------------------------------
+# NLB Outputs (para integração com API Gateway e Application)
+# ------------------------------------------------------------------
+
+output "nlb_arn" {
+  description = "ARN do Network Load Balancer"
+  value       = aws_lb.app.arn
+}
+
+output "nlb_dns_name" {
+  description = "DNS name do Network Load Balancer"
+  value       = aws_lb.app.dns_name
+}
+
+output "nlb_zone_id" {
+  description = "Zone ID do Network Load Balancer"
+  value       = aws_lb.app.zone_id
+}
+
+output "target_group_arn" {
+  description = "ARN do Target Group para aplicação"
+  value       = aws_lb_target_group.app.arn
+}
+
 output "account_info" {
   description = "Informações da conta AWS"
   value = {

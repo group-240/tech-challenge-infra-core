@@ -182,14 +182,28 @@ resource "aws_eks_cluster" "main" {
     endpoint_public_access  = true # Necessário para kubectl access
   }
 
+  # CloudWatch Logs para observabilidade (retenção mínima = 3 dias)
+  enabled_cluster_log_types = ["api", "audit", "authenticator", "controllerManager", "scheduler"]
+
   tags = merge(local.common_tags, {
     Name = "${var.project_name}-eks-cluster"
   })
 
   depends_on = [
     aws_subnet.private_1,
-    aws_subnet.private_2
+    aws_subnet.private_2,
+    aws_cloudwatch_log_group.eks
   ]
+}
+
+# CloudWatch Log Group para EKS (3 dias para custo mínimo)
+resource "aws_cloudwatch_log_group" "eks" {
+  name              = "/aws/eks/${var.project_name}-eks/cluster"
+  retention_in_days = 3
+
+  tags = merge(local.common_tags, {
+    Name = "${var.project_name}-eks-logs"
+  })
 }
 
 # EKS Node Group - CONFIGURAÇÃO MAIS BARATA POSSÍVEL
@@ -224,4 +238,156 @@ resource "aws_eks_node_group" "main" {
     aws_route_table_association.private_1,
     aws_route_table_association.private_2
   ]
+}
+
+# AWS Load Balancer Controller addon para integração com NLB
+resource "aws_eks_addon" "aws_load_balancer_controller" {
+  cluster_name  = aws_eks_cluster.main.name
+  addon_name    = "aws-load-balancer-controller"
+  addon_version = "v2.11.0-eksbuild.1"
+  
+  tags = merge(local.common_tags, {
+    Name = "${var.project_name}-alb-controller"
+  })
+
+  depends_on = [
+    aws_eks_node_group.main
+  ]
+}
+
+# EKS addon para VPC CNI
+resource "aws_eks_addon" "vpc_cni" {
+  cluster_name  = aws_eks_cluster.main.name
+  addon_name    = "vpc-cni"
+  addon_version = "v1.19.0-eksbuild.1"
+  
+  tags = merge(local.common_tags, {
+    Name = "${var.project_name}-vpc-cni"
+  })
+
+  depends_on = [
+    aws_eks_node_group.main
+  ]
+}
+
+# ------------------------------------------------------------------
+# Cognito User Pool (para autenticação da aplicação)
+# ------------------------------------------------------------------
+resource "aws_cognito_user_pool" "main" {
+  name = "${var.project_name}-user-pool"
+
+  # Configuração de senha
+  password_policy {
+    minimum_length    = 8
+    require_lowercase = true
+    require_numbers   = true
+    require_symbols   = false
+    require_uppercase = true
+  }
+
+  # Auto-verificação via email
+  auto_verified_attributes = ["email"]
+
+  # Atributos do schema
+  schema {
+    name                = "email"
+    attribute_data_type = "String"
+    required            = true
+    mutable             = true
+  }
+
+  tags = merge(local.common_tags, {
+    Name = "${var.project_name}-cognito-pool"
+  })
+}
+
+# Cognito User Pool Client (para a aplicação se conectar)
+resource "aws_cognito_user_pool_client" "main" {
+  name         = "${var.project_name}-app-client"
+  user_pool_id = aws_cognito_user_pool.main.id
+
+  # Fluxos de autenticação permitidos
+  explicit_auth_flows = [
+    "ALLOW_USER_PASSWORD_AUTH",
+    "ALLOW_REFRESH_TOKEN_AUTH",
+    "ALLOW_USER_SRP_AUTH"
+  ]
+
+  # Configurações de token
+  refresh_token_validity = 30
+  access_token_validity  = 60
+  id_token_validity      = 60
+
+  token_validity_units {
+    refresh_token = "days"
+    access_token  = "minutes"
+    id_token      = "minutes"
+  }
+
+  # Prevenir secret do client (para apps públicos)
+  generate_secret = false
+}
+
+# Cognito User Pool Domain (para UI de autenticação)
+resource "aws_cognito_user_pool_domain" "main" {
+  domain       = "${var.project_name}-${local.aws_account_id}"
+  user_pool_id = aws_cognito_user_pool.main.id
+}
+
+# ------------------------------------------------------------------
+# Network Load Balancer (NLB) - Infraestrutura compartilhada
+# ------------------------------------------------------------------
+
+# Target Group para o NLB (apontará para os pods da aplicação)
+resource "aws_lb_target_group" "app" {
+  name        = "${var.project_name}-app-tg"
+  port        = 80
+  protocol    = "TCP"
+  vpc_id      = aws_vpc.main.id
+  target_type = "ip"
+
+  health_check {
+    enabled             = true
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+    interval            = 30
+    protocol            = "HTTP"
+    path                = "/api/health"
+    port                = "8080"
+    timeout             = 10
+  }
+
+  tags = merge(local.common_tags, {
+    Name = "${var.project_name}-app-target-group"
+  })
+}
+
+# Network Load Balancer (interno)
+resource "aws_lb" "app" {
+  name               = "${var.project_name}-nlb"
+  internal           = true
+  load_balancer_type = "network"
+  subnets            = [aws_subnet.private_1.id, aws_subnet.private_2.id]
+
+  enable_deletion_protection = false # DEV environment
+
+  tags = merge(local.common_tags, {
+    Name = "${var.project_name}-nlb"
+  })
+}
+
+# Listener para o NLB
+resource "aws_lb_listener" "app" {
+  load_balancer_arn = aws_lb.app.arn
+  port              = "80"
+  protocol          = "TCP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.app.arn
+  }
+
+  tags = merge(local.common_tags, {
+    Name = "${var.project_name}-nlb-listener"
+  })
 }
