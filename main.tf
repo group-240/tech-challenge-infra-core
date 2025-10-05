@@ -174,7 +174,7 @@ resource "aws_route_table_association" "private_2" {
 resource "aws_eks_cluster" "main" {
   name     = "${var.project_name}-eks"
   role_arn = data.aws_iam_role.lab_role.arn
-  version  = "1.34" # Versão atual (requer AL2023)
+  #version  = "1.34" # Versão atual (requer AL2023)
 
   vpc_config {
     subnet_ids              = [aws_subnet.private_1.id, aws_subnet.private_2.id]
@@ -244,7 +244,7 @@ resource "aws_eks_node_group" "main" {
 resource "aws_eks_addon" "aws_load_balancer_controller" {
   cluster_name  = aws_eks_cluster.main.name
   addon_name    = "aws-load-balancer-controller"
-  addon_version = "v2.11.0-eksbuild.1"
+  #addon_version = "v2.11.0-eksbuild.1"
   
   tags = merge(local.common_tags, {
     Name = "${var.project_name}-alb-controller"
@@ -259,7 +259,7 @@ resource "aws_eks_addon" "aws_load_balancer_controller" {
 resource "aws_eks_addon" "vpc_cni" {
   cluster_name  = aws_eks_cluster.main.name
   addon_name    = "vpc-cni"
-  addon_version = "v1.19.0-eksbuild.1"
+  #addon_version = "v1.19.0-eksbuild.1"
   
   tags = merge(local.common_tags, {
     Name = "${var.project_name}-vpc-cni"
