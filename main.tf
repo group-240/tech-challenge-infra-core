@@ -174,7 +174,7 @@ resource "aws_route_table_association" "private_2" {
 resource "aws_eks_cluster" "main" {
   name     = "${var.project_name}-eks"
   role_arn = data.aws_iam_role.lab_role.arn
-  version  = "1.33" # Versão atual (requer AL2023)
+  version  = "1.34" # Versão atual (requer AL2023)
 
   vpc_config {
     subnet_ids              = [aws_subnet.private_1.id, aws_subnet.private_2.id]
