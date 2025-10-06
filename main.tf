@@ -254,57 +254,9 @@ resource "aws_cloudwatch_log_group" "eks" {
   })
 }
 
-# Política IAM adicional para AWS Load Balancer Controller
-# Necessária porque LabRole não tem permissões para gerenciar ELB/TargetGroups
-resource "aws_iam_role_policy" "node_load_balancer_controller" {
-  name = "${var.project_name}-node-alb-controller-policy"
-  role = data.aws_iam_role.lab_role.name
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Action = [
-          "elasticloadbalancing:DescribeLoadBalancers",
-          "elasticloadbalancing:DescribeLoadBalancerAttributes",
-          "elasticloadbalancing:DescribeListeners",
-          "elasticloadbalancing:DescribeListenerCertificates",
-          "elasticloadbalancing:DescribeSSLPolicies",
-          "elasticloadbalancing:DescribeRules",
-          "elasticloadbalancing:DescribeTargetGroups",
-          "elasticloadbalancing:DescribeTargetGroupAttributes",
-          "elasticloadbalancing:DescribeTargetHealth",
-          "elasticloadbalancing:DescribeTags",
-          "elasticloadbalancing:ModifyLoadBalancerAttributes",
-          "elasticloadbalancing:ModifyTargetGroup",
-          "elasticloadbalancing:ModifyTargetGroupAttributes",
-          "elasticloadbalancing:RegisterTargets",
-          "elasticloadbalancing:DeregisterTargets",
-          "elasticloadbalancing:SetIpAddressType",
-          "elasticloadbalancing:SetSecurityGroups",
-          "elasticloadbalancing:SetSubnets",
-          "elasticloadbalancing:AddTags",
-          "elasticloadbalancing:RemoveTags"
-        ]
-        Resource = "*"
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "ec2:DescribeInstances",
-          "ec2:DescribeInstanceStatus",
-          "ec2:DescribeSecurityGroups",
-          "ec2:DescribeSubnets",
-          "ec2:DescribeVpcs",
-          "ec2:DescribeNetworkInterfaces",
-          "ec2:DescribeAvailabilityZones"
-        ]
-        Resource = "*"
-      }
-    ]
-  })
-}
+# NOTA: LabRole do AWS Academy já possui permissões administrativas suficientes
+# para o AWS Load Balancer Controller funcionar. Não é possível adicionar
+# políticas inline em LabRole (managed role).
 
 # EKS Node Group - CONFIGURAÇÃO MAIS BARATA POSSÍVEL
 resource "aws_eks_node_group" "main" {
@@ -336,8 +288,7 @@ resource "aws_eks_node_group" "main" {
   depends_on = [
     aws_eks_cluster.main,
     aws_route_table_association.private_1,
-    aws_route_table_association.private_2,
-    aws_iam_role_policy.node_load_balancer_controller
+    aws_route_table_association.private_2
   ]
 }
 
