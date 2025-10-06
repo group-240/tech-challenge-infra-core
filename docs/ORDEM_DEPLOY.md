@@ -139,6 +139,11 @@ git push origin main
 
 ### ⏱️ Tempo Estimado: 8-12 minutos
 
+### ⚠️ **IMPORTANTE:**
+- Application **NÃO depende** do API Gateway
+- Application é deployado **ANTES** do Gateway
+- Gateway é quem consome o NLB criado pelo infra-core
+
 ### 🔍 Validação:
 ```bash
 # Verificar Pods
@@ -217,8 +222,8 @@ curl -X POST https://<API_ID>.execute-api.us-east-1.amazonaws.com/dev/orders \
 - [ ] 1. Bootstrap (apenas primeira vez)
 - [ ] 2. Core Infrastructure (aguardar conclusão)
 - [ ] 3. Database (aguardar conclusão)
-- [ ] 4. Application (aguardar conclusão)
-- [ ] 5. API Gateway (aguardar conclusão)
+- [ ] 4. Application (aguardar conclusão) ⚠️ **ANTES do Gateway**
+- [ ] 5. API Gateway (aguardar conclusão) ⚠️ **DEPOIS do Application**
 
 ### Validações:
 - [ ] Helm Release instalado e pods running
@@ -275,6 +280,20 @@ graph LR
 ---
 
 ## 🆘 **Troubleshooting**
+
+### ❌ Error: Unable to find remote state (gateway)
+```
+Error: Unable to find remote state
+  with data.terraform_remote_state.gateway
+No stored state was found for the given workspace in the given backend.
+```
+
+**Causa:** Application tentando ler remote state do gateway antes dele ser deployado.
+
+**Solução:** 
+- ✅ **CORRETO:** Deploy application **ANTES** do gateway (ordem 4 → 5)
+- ❌ **ERRADO:** Tentar deployar gateway antes do application
+- 💡 Application NÃO precisa do gateway - dependência foi removida
 
 ### ❌ Helm Release Failed
 ```bash
