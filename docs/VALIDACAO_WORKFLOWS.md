@@ -25,6 +25,9 @@ jobs:
 - ECR Repository (`tech-challenge-api`)
 - Network Load Balancer
 - Target Groups
+- **AWS Load Balancer Controller** (via Helm chart v1.9.2)
+- Service Account do controller
+- CRDs (TargetGroupBinding, IngressClassParams)
 
 #### 🎯 **Ordem de execução**: **1º**
 
@@ -110,7 +113,7 @@ Resources: S3 + DynamoDB para state
 Repository: tech-challenge-infra-core  
 Workflow: main.yml
 Trigger: Push to main
-Resources: VPC, EKS, Cognito, ECR, NLB
+Resources: VPC, EKS, Cognito, ECR, NLB, AWS Load Balancer Controller (Helm)
 
 # 3. Database
 Repository: tech-challenge-infra-database
@@ -167,6 +170,7 @@ JWT_SECRET="dev-jwt-secret-key-12345"
 - [x] Remote state sharing funcionando
 - [x] NLB no infra-core (shared infrastructure)
 - [x] Cognito authorizer implementado
+- [x] AWS Load Balancer Controller instalado automaticamente via Helm
 
 ### ✅ **Deploy Funcional**
 - [x] Terraform init/plan/apply em todos
@@ -235,5 +239,6 @@ Internet → Cognito → API Gateway → VPC Link → NLB → EKS Pods → RDS
 - 1x API Gateway REST
 - 1x Cognito User Pool
 - 1x ECR repository
+- 1x AWS Load Balancer Controller (via Helm)
 
 **✅ Todos os workflows estão validados e prontos para deploy na AWS!**
