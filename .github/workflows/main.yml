@@ -31,6 +31,11 @@ jobs:
         aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
         aws-region: ${{ env.AWS_REGION }}
 
+    - name: Generate Backend Configuration
+      run: |
+        chmod +x generate-backend.sh
+        ./generate-backend.sh
+
     - name: Terraform Init
       run: terraform init
 
@@ -88,6 +93,11 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
         aws-region: ${{ env.AWS_REGION }}
+
+    - name: Generate Backend Configuration
+      run: |
+        chmod +x generate-backend.sh
+        ./generate-backend.sh
 
     - name: Terraform Init
       run: terraform init

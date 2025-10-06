@@ -1,7 +1,3 @@
-# ==============================================================================
-# VARIÁVEIS COM DEFAULTS - Facilita manutenção (sem terraform.tfvars)
-# ==============================================================================
-
 variable "project_name" {
   description = "Nome do projeto"
   type        = string
@@ -19,10 +15,6 @@ variable "owner" {
   type        = string
   default     = "student"
 }
-
-# ==============================================================================
-# EKS Node Group Configuration
-# ==============================================================================
 
 variable "node_instance_type" {
   description = "Tipo de instância para nodes EKS"

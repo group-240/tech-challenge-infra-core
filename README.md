@@ -2,72 +2,139 @@
 
 Infraestrutura base para o Tech Challenge usando AWS EKS.
 
-## 🏗️ Arquitetura
+## Arquitetura
 
 Este repositório cria:
-- **VPC**: 10.0.0.0/16
-- **2 Subnets Privadas**: Em AZs diferentes (requerido pelo EKS)
-- **EKS Cluster**: Kubernetes gerenciado
-- **Node Group**: 1 node t3.small (mínimo viável para EKS)
+- VPC: 10.0.0.0/16
+- 2 Subnets Privadas (AZs diferentes)
+- EKS Cluster + Node Group
+- Load Balancer Controller
+- Cognito User Pool
+- ECR Repository
+- Network Load Balancer
 
-## 📋 Pré-requisitos
+## Pré-requisitos
 
-1. Conta AWS (533267363894)
-2. GitHub Secrets configurados:
-   - `AWS_ACCESS_KEY_ID`
-   - `AWS_SECRET_ACCESS_KEY`
-   - `AWS_SESSION_TOKEN` (se usar credenciais temporárias)
+1. Conta AWS configurada
+2. GitHub Secrets:
+   - AWS_ACCESS_KEY_ID
+   - AWS_SECRET_ACCESS_KEY
+   - AWS_SESSION_TOKEN
 
-## 🚀 Deploy
+## Configuração Única
 
-### 1. Bootstrap (Primeira vez apenas)
+**Tudo é configurado em um único lugar**: `locals.tf`
 
-Execute o workflow **"Bootstrap - Create S3 Backend"** manualmente no GitHub Actions.
+```terraform
+locals {
+  aws_account_id     = "533267363894"
+  aws_account_suffix = "533267363894-10"  # Mude apenas este valor
+  aws_region         = "us-east-1"
+}
+```
 
-Isso cria:
-- Bucket S3 para Terraform state
-- Tabela DynamoDB para state locking
+Para alterar o account suffix:
+1. Edite `locals.tf`
+2. Execute bootstrap: `cd bootstrap && terraform apply`
+3. Push para main (workflow gera backend automaticamente)
+
+## Deploy
+
+### 1. Bootstrap (Primeira Execução)
+
+Cria S3 bucket e DynamoDB table:
+
+```bash
+cd bootstrap
+terraform init
+terraform apply
+```
+
+Ou via GitHub Actions: Workflow "Bootstrap"
 
 ### 2. Infraestrutura Principal
 
-Após o bootstrap:
-- Push para `main` → Deploy automático
-- Pull Request → Plan automático com comentário
+Automático via workflow:
+- Push para main: Deploy automático
+- Pull Request: Plan com comentário no PR
 
-## 📦 Recursos Criados
+Local:
+```bash
+./generate-backend.sh  # Gera backend.tf
+terraform init
+terraform apply
+```
 
-| Recurso | Tipo | Quantidade |
-|---------|------|------------|
-| VPC | aws_vpc | 1 |
-| Subnets Privadas | aws_subnet | 2 |
-| EKS Cluster | aws_eks_cluster | 1 |
-| Node Group | aws_eks_node_group | 1 node t3.small |
+## Estrutura de Arquivos
 
-## 💰 Custos Estimados
+```
+locals.tf              # Configuração única
+data.tf                # Data sources
+variables.tf           # Variables com defaults
+outputs.tf             # Outputs
+backend.tf             # Gerado automaticamente
+main.tf                # Resources
+generate-backend.sh    # Script de geração
 
-- **EKS Cluster**: ~$72/mês (control plane)
-- **t3.small node**: ~$15/mês (On-Demand)
-- **Total**: ~$87/mês
+bootstrap/
+├── main.tf           # Cria S3 + DynamoDB
+├── variables.tf      # Sincronizado com locals.tf
+└── outputs.tf        # Exibe recursos criados
 
-## 🔧 Configuração
+.github/workflows/
+├── bootstrap.yml     # Workflow de bootstrap
+├── main.yml          # Deploy automático com backend
+└── destroy.yml       # Destruição completa
+```
 
-- **Região**: us-east-1 (fixo)
-- **Ambiente**: dev (fixo)
-- **Backend**: S3 + DynamoDB
+## Backend Automático
 
-## 📝 Outputs
+O workflow `main.yml` gera automaticamente o `backend.tf` antes do `terraform init`:
 
-Após o deploy, você terá acesso a:
-- VPC ID
-- Subnet IDs
-- EKS Cluster Endpoint
-- Security Group ID
+```yaml
+- name: Generate Backend Configuration
+  run: |
+    chmod +x generate-backend.sh
+    ./generate-backend.sh
+```
 
-Use esses outputs em outros repositórios.
+Isso garante que o backend está sempre sincronizado com o `locals.tf`.
 
-## ⚠️ Notas Importantes
+## Outputs
 
-1. **t3.nano/micro NÃO funcionam** com EKS (muito pequenos para pods do sistema)
-2. EKS **requer 2+ subnets** em AZs diferentes
-3. Credenciais temporárias **expiram** - use IAM user permanente para CI/CD
-4. Este é apenas o **core** - API Gateway e aplicações vão em outros repos
+Disponíveis para outros repositórios:
+- VPC: IDs, CIDRs, subnets
+- EKS: Cluster, endpoint, security group
+- Cognito: User Pool ARN
+- NLB: DNS, ARN, Target Group
+- ECR: Repository URL
+
+## Documentação
+
+- [Backend Automático](docs/BACKEND_AUTOMATICO.md)
+- [Configuração Única](docs/CONFIGURACAO_UNICA.md)
+- [Estrutura de Arquivos](docs/ESTRUTURA_ARQUIVOS.md)
+- [Destruição Total](docs/GUIA_DESTRUICAO_TOTAL.md)
+
+## Custos Estimados
+
+- EKS Cluster: ~$72/mês
+- t3.small node: ~$15/mês
+- Total: ~$87/mês
+
+## Integração com Outros Repositórios
+
+Cada repositório usa o mesmo backend S3:
+
+**tech-challenge-infra-database:**
+```terraform
+terraform {
+  backend "s3" {
+    bucket = "tech-challenge-tfstate-533267363894-10"
+    key    = "database/terraform.tfstate"
+    # ...
+  }
+}
+```
+
+Sincronize o `aws_account_suffix` em todos os repositórios após alteração.
