@@ -404,6 +404,12 @@ resource "helm_release" "aws_load_balancer_controller" {
     value = aws_vpc.main.id
   }
 
+  # IMPORTANTE: Habilitar uso de credenciais do node (LabRole tem permissões necessárias)
+  set {
+    name  = "hostNetwork"
+    value = "true"
+  }
+
   # Desabilitar webhook para simplificar (funciona sem ele)
   set {
     name  = "enableCertManager"
