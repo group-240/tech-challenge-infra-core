@@ -89,15 +89,23 @@ Todos apontam para:
 - DynamoDB: `tech-challenge-terraform-lock-533267363894-10`
 - Keys específicas por repositório
 
-## Commit Aplicado
+## Commits Aplicados
 
+### 1. Correção do Script de Geração do Backend
 ```
 commit a0e461b
-Author: [seu nome]
-Date: [data]
-
 fix: corrige generate-backend.sh para evitar quebras de linha em strings
 ```
+
+### 2. Correção de Referência Circular
+```
+commit 673c920
+fix: corrige referência circular em module_tags (deve usar common_tags)
+```
+
+**Problema adicional encontrado**: `main.tf` tinha uma referência circular onde `module_tags` tentava fazer merge com ele mesmo.
+
+**Solução**: Alterado de `merge(local.module_tags, {...})` para `merge(local.common_tags, {...})` na definição do `module_tags`.
 
 ## Próximos Passos
 
