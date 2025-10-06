@@ -555,7 +555,7 @@ resource "aws_lb_target_group" "app" {
     unhealthy_threshold = 2
     interval            = 30
     protocol            = "HTTP"
-    path                = "/actuator/health"
+    path                = "/api/health"  # Corrigido para usar o context-path correto da aplicação
     port                = "traffic-port"  # Usa a mesma porta do tráfego (80)
     timeout             = 10
   }
