@@ -1,13 +1,15 @@
 # ==============================================================================
-# CONFIGURAÇÃO CENTRALIZADA - AWS Learner Lab
+# LOCALS - Configuração Centralizada
 # ==============================================================================
 # 
 # ⚙️ PONTO ÚNICO DE CONFIGURAÇÃO
-# Altere apenas o 'aws_account_suffix' abaixo e ele será propagado para:
-#   - Terraform backend (S3 + DynamoDB)
-#   - Bootstrap (criação dos recursos)
-#   - Todos os outputs
+# Altere apenas o 'aws_account_suffix' e ele será propagado para:
+#   - Nomes de recursos S3/DynamoDB
 #   - Tags de recursos
+#   - Outputs
+#
+# ⚠️ IMPORTANTE: O backend S3 no main.tf ainda precisa ser atualizado manualmente
+#    após mudar o aws_account_suffix (limitação do Terraform)
 #
 # ==============================================================================
 
@@ -22,7 +24,7 @@ locals {
   # ┌─────────────────────────────────────────────────────────────────────┐
   # │ 📦 NOMES DE RECURSOS (gerados automaticamente)                      │
   # └─────────────────────────────────────────────────────────────────────┘
-  s3_bucket_name     = "tech-challenge-tfstate-${local.aws_account_suffix}"
+  s3_bucket_name      = "tech-challenge-tfstate-${local.aws_account_suffix}"
   dynamodb_table_name = "tech-challenge-terraform-lock-${local.aws_account_suffix}"
   
   # ┌─────────────────────────────────────────────────────────────────────┐
@@ -31,33 +33,21 @@ locals {
   lab_role_arn = "arn:aws:iam::${local.aws_account_id}:role/LabRole"
   
   # ┌─────────────────────────────────────────────────────────────────────┐
-  # │ 🏷️ TAGS PADRÃO (aplicadas a todos os recursos)                     │
+  # │ 🏷️ TAGS PADRÃO (aplicadas a todos os recursos)                      │
   # └─────────────────────────────────────────────────────────────────────┘
   common_tags = {
-    AccountId      = local.aws_account_id
-    AccountSuffix  = local.aws_account_suffix
-    Region         = local.aws_region
-    Lab            = "aws-learner-lab"
-    Owner          = var.owner
-    Environment    = var.environment
-    Project        = var.project_name
-    ManagedBy      = "terraform"
+    AccountId     = local.aws_account_id
+    AccountSuffix = local.aws_account_suffix
+    Region        = local.aws_region
+    Lab           = "aws-learner-lab"
+    Owner         = var.owner
+    Environment   = var.environment
+    Project       = var.project_name
+    ManagedBy     = "terraform"
   }
-}
-
-# ==============================================================================
-# DATA SOURCES
-# ==============================================================================
-
-# Data source para LabRole (necessário para EKS)
-data "aws_iam_role" "lab_role" {
-  name = "LabRole"
-}
-
-# Validação da conta AWS
-data "aws_caller_identity" "current" {}
-
-# Verificação de conta correta
-locals {
+  
+  # ┌─────────────────────────────────────────────────────────────────────┐
+  # │ ✅ VALIDAÇÃO DE CONTA                                               │
+  # └─────────────────────────────────────────────────────────────────────┘
   is_correct_account = data.aws_caller_identity.current.account_id == local.aws_account_id
 }

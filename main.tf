@@ -3,7 +3,16 @@
 # Descrição: Ponto de entrada principal do Terraform para a infraestrutura core.
 # ------------------------------------------------------------------
 
+# ==============================================================================
+# TERRAFORM CONFIGURATION
+# ==============================================================================
+# 
+# Backend S3 está configurado em backend.tf (gerado automaticamente)
+# ==============================================================================
+
 terraform {
+  required_version = ">= 1.5.0"
+  
   required_providers {
     aws = {
       source  = "hashicorp/aws"
@@ -17,26 +26,6 @@ terraform {
       source  = "hashicorp/kubernetes"
       version = "~> 2.25"
     }
-  }
-
-  # ===========================================================================
-  # BACKEND S3 - Armazenamento Remoto do State
-  # ===========================================================================
-  # 
-  # ⚙️ CONFIGURAÇÃO CENTRALIZADA
-  # Os nomes abaixo são gerados a partir de lab-config.tf:
-  #   - Bucket: tech-challenge-tfstate-{aws_account_suffix}
-  #   - Table:  tech-challenge-terraform-lock-{aws_account_suffix}
-  #
-  # 🔄 Para mudar, altere APENAS o 'aws_account_suffix' em lab-config.tf
-  # 
-  # ===========================================================================
-  backend "s3" {
-    bucket         = "tech-challenge-tfstate-533267363894-10"
-    key            = "core/terraform.tfstate"
-    region         = "us-east-1"
-    dynamodb_table = "tech-challenge-terraform-lock-533267363894-10"
-    encrypt        = true
   }
 }
 
@@ -97,7 +86,10 @@ locals {
   })
 }
 
-# VPC - APENAS 1
+# ==============================================================================
+# VPC - Virtual Private Cloud
+# ==============================================================================
+
 resource "aws_vpc" "main" {
   cidr_block           = "10.0.0.0/16"
   enable_dns_hostnames = true
@@ -108,10 +100,9 @@ resource "aws_vpc" "main" {
   })
 }
 
-# Data source para primeira AZ disponível
-data "aws_availability_zones" "available" {
-  state = "available"
-}
+# ==============================================================================
+# Internet Gateway & NAT Gateway
+# ==============================================================================
 
 # Internet Gateway (necessário para conectividade externa)
 resource "aws_internet_gateway" "main" {
@@ -350,22 +341,9 @@ resource "aws_eks_addon" "coredns" {
   ]
 }
 
-# ------------------------------------------------------------------
-# AWS Load Balancer Controller - Instalação via Helm (AUTOMATIZADA)
-# ------------------------------------------------------------------
-
-# Namespace para o controller (kube-system já existe por padrão)
-# Não precisa criar, mas vamos garantir que está pronto
-data "kubernetes_namespace" "kube_system" {
-  metadata {
-    name = "kube-system"
-  }
-
-  depends_on = [
-    aws_eks_cluster.main,
-    aws_eks_node_group.main
-  ]
-}
+# ==============================================================================
+# AWS Load Balancer Controller - Instalação via Helm
+# ==============================================================================
 
 # Service Account para o AWS Load Balancer Controller
 # Usando LabRole existente (sem IRSA devido a limitações do AWS Academy)
