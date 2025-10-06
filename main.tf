@@ -9,6 +9,14 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 5.0"
     }
+    helm = {
+      source  = "hashicorp/helm"
+      version = "~> 2.12"
+    }
+    kubernetes = {
+      source  = "hashicorp/kubernetes"
+      version = "~> 2.25"
+    }
   }
 
   # Backend S3 específico para sua conta AWS (891377164819)
@@ -26,6 +34,46 @@ provider "aws" {
 
   default_tags {
     tags = local.common_tags
+  }
+}
+
+# Provider Kubernetes para gerenciar recursos no EKS
+provider "kubernetes" {
+  host                   = aws_eks_cluster.main.endpoint
+  cluster_ca_certificate = base64decode(aws_eks_cluster.main.certificate_authority[0].data)
+  
+  exec {
+    api_version = "client.authentication.k8s.io/v1beta1"
+    command     = "aws"
+    args = [
+      "eks",
+      "get-token",
+      "--cluster-name",
+      aws_eks_cluster.main.name,
+      "--region",
+      local.aws_region
+    ]
+  }
+}
+
+# Provider Helm para instalar charts automaticamente
+provider "helm" {
+  kubernetes {
+    host                   = aws_eks_cluster.main.endpoint
+    cluster_ca_certificate = base64decode(aws_eks_cluster.main.certificate_authority[0].data)
+    
+    exec {
+      api_version = "client.authentication.k8s.io/v1beta1"
+      command     = "aws"
+      args = [
+        "eks",
+        "get-token",
+        "--cluster-name",
+        aws_eks_cluster.main.name,
+        "--region",
+        local.aws_region
+      ]
+    }
   }
 }
 
@@ -286,6 +334,93 @@ resource "aws_eks_addon" "coredns" {
 }
 
 # ------------------------------------------------------------------
+# AWS Load Balancer Controller - Instalação via Helm (AUTOMATIZADA)
+# ------------------------------------------------------------------
+
+# Namespace para o controller (kube-system já existe por padrão)
+# Não precisa criar, mas vamos garantir que está pronto
+data "kubernetes_namespace" "kube_system" {
+  metadata {
+    name = "kube-system"
+  }
+
+  depends_on = [
+    aws_eks_cluster.main,
+    aws_eks_node_group.main
+  ]
+}
+
+# Service Account para o AWS Load Balancer Controller
+# Usando LabRole existente (sem IRSA devido a limitações do AWS Academy)
+resource "kubernetes_service_account" "aws_load_balancer_controller" {
+  metadata {
+    name      = "aws-load-balancer-controller"
+    namespace = "kube-system"
+    labels = {
+      "app.kubernetes.io/name"      = "aws-load-balancer-controller"
+      "app.kubernetes.io/component" = "controller"
+    }
+  }
+
+  depends_on = [
+    data.kubernetes_namespace.kube_system
+  ]
+}
+
+# Instalar AWS Load Balancer Controller via Helm
+resource "helm_release" "aws_load_balancer_controller" {
+  name       = "aws-load-balancer-controller"
+  repository = "https://aws.github.io/eks-charts"
+  chart      = "aws-load-balancer-controller"
+  namespace  = "kube-system"
+  version    = "1.9.2"  # Compatível com EKS 1.33
+
+  set {
+    name  = "clusterName"
+    value = aws_eks_cluster.main.name
+  }
+
+  set {
+    name  = "serviceAccount.create"
+    value = "false"
+  }
+
+  set {
+    name  = "serviceAccount.name"
+    value = kubernetes_service_account.aws_load_balancer_controller.metadata[0].name
+  }
+
+  set {
+    name  = "region"
+    value = local.aws_region
+  }
+
+  set {
+    name  = "vpcId"
+    value = aws_vpc.main.id
+  }
+
+  # Desabilitar webhook para simplificar (funciona sem ele)
+  set {
+    name  = "enableCertManager"
+    value = "false"
+  }
+
+  # Usar credenciais do node (LabRole) ao invés de IRSA
+  set {
+    name  = "serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn"
+    value = ""
+  }
+
+  depends_on = [
+    aws_eks_node_group.main,
+    aws_eks_addon.vpc_cni,
+    aws_eks_addon.coredns,
+    kubernetes_service_account.aws_load_balancer_controller
+  ]
+}
+
+# ------------------------------------------------------------------
 # Cognito User Pool (para autenticação da aplicação)
 # ------------------------------------------------------------------
 resource "aws_cognito_user_pool" "main" {
@@ -406,13 +541,13 @@ resource "aws_ecr_lifecycle_policy" "app" {
 # Network Load Balancer (NLB) - Infraestrutura compartilhada
 # ------------------------------------------------------------------
 
-# Target Group para o NLB (apontará para NodePort 30080 nos EC2 nodes)
+# Target Group para o NLB (gerenciado via TargetGroupBinding)
 resource "aws_lb_target_group" "app" {
   name        = "${var.project_name}-app-tg"
-  port        = 30080  # NodePort do Kubernetes service
+  port        = 80  # Porta do ClusterIP Service
   protocol    = "TCP"
   vpc_id      = aws_vpc.main.id
-  target_type = "instance"  # Aponta para os EC2 nodes, não IPs
+  target_type = "ip"  # AWS Load Balancer Controller registra IPs dos pods automaticamente
 
   health_check {
     enabled             = true
@@ -421,7 +556,7 @@ resource "aws_lb_target_group" "app" {
     interval            = 30
     protocol            = "HTTP"
     path                = "/actuator/health"
-    port                = "30080"  # Health check na NodePort
+    port                = "traffic-port"  # Usa a mesma porta do tráfego (80)
     timeout             = 10
   }
 
