@@ -370,6 +370,17 @@ resource "helm_release" "aws_load_balancer_controller" {
   namespace  = "kube-system"
   version    = "1.9.2"  # Compatível com EKS 1.33
 
+  timeout       = 600  # 10 minutos (ao invés do padrão de 5 minutos)
+  wait          = true
+  wait_for_jobs = true
+  
+  # Permitir que o Terraform continue mesmo se o release falhar
+  # (útil em casos de timeout mas o deployment está progredindo)
+  atomic                     = false
+  cleanup_on_fail            = false
+  replace                    = true
+  disable_webhooks           = true  # Desabilitar webhooks de validação que podem causar timeout
+
   set {
     name  = "clusterName"
     value = aws_eks_cluster.main.name
@@ -410,6 +421,22 @@ resource "helm_release" "aws_load_balancer_controller" {
   # Desabilitar webhook para simplificar (funciona sem ele)
   set {
     name  = "enableCertManager"
+    value = "false"
+  }
+
+  # Desabilitar completamente os webhooks de validação (podem causar timeout)
+  set {
+    name  = "webhookTLS.enabled"
+    value = "false"
+  }
+
+  set {
+    name  = "enableMutatingWebhook"
+    value = "false"
+  }
+
+  set {
+    name  = "enableValidatingWebhook"
     value = "false"
   }
 
