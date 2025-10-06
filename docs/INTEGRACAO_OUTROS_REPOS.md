@@ -255,16 +255,14 @@ Cada repositório tem seu próprio state isolado no mesmo bucket.
 ## Troubleshooting
 
 ### State não encontrado
-```
-Error: Failed to get existing workspaces
-```
+
+Erro: `Failed to get existing workspaces`
 
 Solução: Execute bootstrap primeiro no infra-core
 
 ### Lock travado
-```
-Error: Error acquiring the state lock
-```
+
+Erro: `Error acquiring the state lock`
 
 Solução:
 ```bash
@@ -272,13 +270,27 @@ terraform force-unlock <LOCK_ID>
 ```
 
 ### Conflito de backend
-```
-Error: Backend configuration changed
-```
+
+Erro: `Backend configuration changed`
 
 Solução:
 ```bash
 terraform init -reconfigure
+```
+
+### Erro EPIPE no workflow
+
+Erro: `write EPIPE` ou `jq: parse error`
+
+Causa: Terraform wrapper quebra JSON output
+
+Solução: Adicionar `terraform_wrapper: false` no workflow:
+```yaml
+- name: Setup Terraform
+  uses: hashicorp/setup-terraform@v2
+  with:
+    terraform_version: ${{ env.TF_VERSION }}
+    terraform_wrapper: false
 ```
 
 ## Dependências
