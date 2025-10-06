@@ -20,7 +20,6 @@ Este repositório cria:
 
 ## 🚀 Deploy
 
-
 ### 1. Bootstrap (Primeira vez apenas)
 
 Execute o workflow **"Bootstrap - Create S3 Backend"** manualmente no GitHub Actions.
