@@ -395,6 +395,12 @@ resource "helm_release" "aws_load_balancer_controller" {
     value = aws_vpc.main.id
   }
 
+  # Apenas 1 réplica (suficiente para ambiente de desenvolvimento + economia de recursos)
+  set {
+    name  = "replicaCount"
+    value = "1"
+  }
+
   # IMPORTANTE: Habilitar uso de credenciais do node (LabRole tem permissões necessárias)
   set {
     name  = "hostNetwork"
