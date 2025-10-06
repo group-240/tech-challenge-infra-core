@@ -1,7 +1,20 @@
-# ------------------------------------------------------------------
-# Bootstrap: Recursos necessários para o backend do Terraform
-# Este arquivo cria S3 e DynamoDB ANTES da infraestrutura principal
-# ------------------------------------------------------------------
+# ==============================================================================
+# BOOTSTRAP - Criação do Backend S3/DynamoDB
+# ==============================================================================
+# 
+# ⚠️ IMPORTANTE: Execute este módulo PRIMEIRO, antes da infraestrutura principal
+# 
+# Este módulo cria:
+#   - Bucket S3 para armazenar o state do Terraform
+#   - Tabela DynamoDB para lock do state
+#
+# Os nomes dos recursos são definidos de forma centralizada:
+#   - Bucket S3: tech-challenge-tfstate-{aws_account_suffix}
+#   - DynamoDB:  tech-challenge-terraform-lock-{aws_account_suffix}
+#
+# O valor de {aws_account_suffix} vem do arquivo ../lab-config.tf
+# Altere lá para propagar para todos os repositórios.
+# ==============================================================================
 
 terraform {
   required_providers {
@@ -11,28 +24,35 @@ terraform {
     }
   }
   
-  # SEM backend S3 - usa state local temporariamente
-  # Após criar o S3, migraremos o state
+  # ⚠️ SEM backend S3 aqui - bootstrap usa state local
+  # Após criar o S3, a infra principal usará o backend remoto
 }
 
 provider "aws" {
-  region = "us-east-1"  # Região fixa para sua conta
+  region = var.aws_region
 }
 
+# ==============================================================================
+# CONFIGURAÇÃO CENTRALIZADA
+# ==============================================================================
+
 locals {
-  # Configuração específica para conta AWS 533267363894
-  # Sufixo -10 padronizado para todos os recursos S3/DynamoDB
-  account_id     = "533267363894"
-  account_suffix = "533267363894-10"
-  bucket_name    = "tech-challenge-tfstate-${local.account_suffix}"
-  table_name     = "tech-challenge-terraform-lock-${local.account_suffix}"
+  # 🎯 Valores vindos das variáveis (definidas com defaults)
+  account_id     = var.aws_account_id
+  account_suffix = var.aws_account_suffix
   
+  # 📦 Nomes dos recursos (gerados automaticamente)
+  bucket_name = "tech-challenge-tfstate-${local.account_suffix}"
+  table_name  = "tech-challenge-terraform-lock-${local.account_suffix}"
+  
+  # 🏷️ Tags comuns
   common_tags = {
-    Environment = "dev"
-    Project     = var.project_name
-    ManagedBy   = "terraform-bootstrap"
-    AccountId   = local.account_id
-    Owner       = "aws-learner-lab"
+    Environment   = var.environment
+    Project       = var.project_name
+    ManagedBy     = "terraform-bootstrap"
+    AccountId     = local.account_id
+    AccountSuffix = local.account_suffix
+    Owner         = var.owner
   }
 }
 

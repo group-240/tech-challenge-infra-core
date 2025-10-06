@@ -102,7 +102,10 @@ output "target_group_arn" {
   value       = aws_lb_target_group.app.arn
 }
 
-# ECR Repository outputs
+# ==============================================================================
+# ECR Repository Outputs
+# ==============================================================================
+
 output "ecr_repository_url" {
   description = "URL do repositório ECR"
   value       = aws_ecr_repository.app.repository_url
@@ -113,13 +116,43 @@ output "ecr_repository_name" {
   value       = aws_ecr_repository.app.name
 }
 
+# ==============================================================================
+# Account & Configuration Outputs
+# ==============================================================================
+
 output "account_info" {
   description = "Informações da conta AWS"
   value = {
-    account_id  = local.aws_account_id
-    region      = local.aws_region
-    project     = var.project_name
-    environment = "dev"
-    lab_role    = data.aws_iam_role.lab_role.arn
+    account_id      = local.aws_account_id
+    account_suffix  = local.aws_account_suffix
+    region          = local.aws_region
+    project         = var.project_name
+    environment     = var.environment
+    lab_role        = data.aws_iam_role.lab_role.arn
+  }
+}
+
+output "account_validation" {
+  description = "Validação da conta AWS (certifica que está na conta correta)"
+  value = {
+    expected_account = local.aws_account_id
+    current_account  = data.aws_caller_identity.current.account_id
+    is_valid         = local.is_correct_account
+    lab_role         = local.lab_role_arn
+    region           = local.aws_region
+  }
+}
+
+# ==============================================================================
+# Backend Configuration Outputs (para outros repositórios)
+# ==============================================================================
+
+output "backend_config" {
+  description = "Configuração do backend S3 para usar em outros repositórios"
+  value = {
+    bucket         = local.s3_bucket_name
+    dynamodb_table = local.dynamodb_table_name
+    region         = local.aws_region
+    encrypt        = true
   }
 }

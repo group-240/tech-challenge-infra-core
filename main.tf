@@ -19,12 +19,23 @@ terraform {
     }
   }
 
-  # Backend S3 específico para sua conta AWS (variável definida em lab-config.tf)
+  # ===========================================================================
+  # BACKEND S3 - Armazenamento Remoto do State
+  # ===========================================================================
+  # 
+  # ⚙️ CONFIGURAÇÃO CENTRALIZADA
+  # Os nomes abaixo são gerados a partir de lab-config.tf:
+  #   - Bucket: tech-challenge-tfstate-{aws_account_suffix}
+  #   - Table:  tech-challenge-terraform-lock-{aws_account_suffix}
+  #
+  # 🔄 Para mudar, altere APENAS o 'aws_account_suffix' em lab-config.tf
+  # 
+  # ===========================================================================
   backend "s3" {
-    bucket         = "tech-challenge-tfstate-533267363894-10"  # Padrão: tech-challenge-tfstate-${local.aws_account_suffix}
+    bucket         = "tech-challenge-tfstate-533267363894-10"
     key            = "core/terraform.tfstate"
     region         = "us-east-1"
-    dynamodb_table = "tech-challenge-terraform-lock-533267363894-10"  # Padrão: tech-challenge-terraform-lock-${local.aws_account_suffix}
+    dynamodb_table = "tech-challenge-terraform-lock-533267363894-10"
     encrypt        = true
   }
 }
@@ -33,7 +44,7 @@ provider "aws" {
   region = local.aws_region  # us-east-1 fixo
 
   default_tags {
-    tags = local.common_tags
+    tags = local.module_tags
   }
 }
 
@@ -77,9 +88,11 @@ provider "helm" {
   }
 }
 
-# Tags padrão usando configurações da conta
+# ==============================================================================
+# TAGS LOCAIS (mescla tags comuns + tags específicas deste módulo)
+# ==============================================================================
 locals {
-  common_tags = merge(local.account_tags, {
+  module_tags = merge(local.module_tags, {
     Component = "infrastructure-core"
   })
 }
@@ -90,7 +103,7 @@ resource "aws_vpc" "main" {
   enable_dns_hostnames = true
   enable_dns_support   = true
 
-  tags = merge(local.common_tags, {
+  tags = merge(local.module_tags, {
     Name = "${var.project_name}-vpc"
   })
 }
@@ -104,7 +117,7 @@ data "aws_availability_zones" "available" {
 resource "aws_internet_gateway" "main" {
   vpc_id = aws_vpc.main.id
 
-  tags = merge(local.common_tags, {
+  tags = merge(local.module_tags, {
     Name = "${var.project_name}-igw"
   })
 }
@@ -116,7 +129,7 @@ resource "aws_subnet" "public" {
   availability_zone       = data.aws_availability_zones.available.names[0]
   map_public_ip_on_launch = true
 
-  tags = merge(local.common_tags, {
+  tags = merge(local.module_tags, {
     Name                     = "${var.project_name}-public-subnet"
     Type                     = "public"
     "kubernetes.io/role/elb" = "1"
@@ -127,7 +140,7 @@ resource "aws_subnet" "public" {
 resource "aws_eip" "nat" {
   domain = "vpc"
 
-  tags = merge(local.common_tags, {
+  tags = merge(local.module_tags, {
     Name = "${var.project_name}-nat-eip"
   })
 
@@ -139,7 +152,7 @@ resource "aws_nat_gateway" "main" {
   allocation_id = aws_eip.nat.id
   subnet_id     = aws_subnet.public.id
 
-  tags = merge(local.common_tags, {
+  tags = merge(local.module_tags, {
     Name = "${var.project_name}-nat"
   })
 
@@ -155,7 +168,7 @@ resource "aws_route_table" "public" {
     gateway_id = aws_internet_gateway.main.id
   }
 
-  tags = merge(local.common_tags, {
+  tags = merge(local.module_tags, {
     Name = "${var.project_name}-public-rt"
   })
 }
@@ -175,7 +188,7 @@ resource "aws_route_table" "private" {
     nat_gateway_id = aws_nat_gateway.main.id
   }
 
-  tags = merge(local.common_tags, {
+  tags = merge(local.module_tags, {
     Name = "${var.project_name}-private-rt"
   })
 }
@@ -186,7 +199,7 @@ resource "aws_subnet" "private_1" {
   cidr_block        = "10.0.1.0/24"
   availability_zone = data.aws_availability_zones.available.names[0]
 
-  tags = merge(local.common_tags, {
+  tags = merge(local.module_tags, {
     Name                              = "${var.project_name}-private-subnet-1"
     Type                              = "private"
     "kubernetes.io/role/internal-elb" = "1"
@@ -199,7 +212,7 @@ resource "aws_subnet" "private_2" {
   cidr_block        = "10.0.2.0/24"
   availability_zone = data.aws_availability_zones.available.names[1]
 
-  tags = merge(local.common_tags, {
+  tags = merge(local.module_tags, {
     Name                              = "${var.project_name}-private-subnet-2"
     Type                              = "private"
     "kubernetes.io/role/internal-elb" = "1"
@@ -233,7 +246,7 @@ resource "aws_eks_cluster" "main" {
   # CloudWatch Logs para observabilidade (retenção mínima = 3 dias)
   enabled_cluster_log_types = ["api", "audit", "authenticator", "controllerManager", "scheduler"]
 
-  tags = merge(local.common_tags, {
+  tags = merge(local.module_tags, {
     Name = "${var.project_name}-eks-cluster"
   })
 
@@ -249,7 +262,7 @@ resource "aws_cloudwatch_log_group" "eks" {
   name              = "/aws/eks/${var.project_name}-eks/cluster"
   retention_in_days = 3
 
-  tags = merge(local.common_tags, {
+  tags = merge(local.module_tags, {
     Name = "${var.project_name}-eks-logs"
   })
 }
@@ -281,7 +294,7 @@ resource "aws_eks_node_group" "main" {
   disk_size = 20 # GB mínimo para EKS (não pode ser menor)
   ami_type  = "AL2023_x86_64_STANDARD" # Amazon Linux 2023 (requerido para K8s 1.33+)
 
-  tags = merge(local.common_tags, {
+  tags = merge(local.module_tags, {
     Name = "${var.project_name}-eks-nodes"
   })
 
@@ -298,7 +311,7 @@ resource "aws_eks_addon" "vpc_cni" {
   addon_name    = "vpc-cni"
   # Versão será escolhida automaticamente pela AWS
   
-  tags = merge(local.common_tags, {
+  tags = merge(local.module_tags, {
     Name = "${var.project_name}-vpc-cni"
   })
 
@@ -313,7 +326,7 @@ resource "aws_eks_addon" "kube_proxy" {
   addon_name    = "kube-proxy"
   # Versão será escolhida automaticamente pela AWS
   
-  tags = merge(local.common_tags, {
+  tags = merge(local.module_tags, {
     Name = "${var.project_name}-kube-proxy"
   })
 
@@ -328,7 +341,7 @@ resource "aws_eks_addon" "coredns" {
   addon_name    = "coredns"
   # Versão será escolhida automaticamente pela AWS
   
-  tags = merge(local.common_tags, {
+  tags = merge(local.module_tags, {
     Name = "${var.project_name}-coredns"
   })
 
@@ -456,7 +469,7 @@ resource "aws_cognito_user_pool" "main" {
     mutable             = true
   }
 
-  tags = merge(local.common_tags, {
+  tags = merge(local.module_tags, {
     Name = "${var.project_name}-cognito-pool"
   })
 }
@@ -506,7 +519,7 @@ resource "aws_ecr_repository" "app" {
     scan_on_push = false # Desabilitado para economizar custos
   }
 
-  tags = merge(local.common_tags, {
+  tags = merge(local.module_tags, {
     Name = "${var.project_name}-ecr-repository"
   })
 }
@@ -570,7 +583,7 @@ resource "aws_lb_target_group" "app" {
     timeout             = 10
   }
 
-  tags = merge(local.common_tags, {
+  tags = merge(local.module_tags, {
     Name = "${var.project_name}-app-target-group"
   })
 }
@@ -584,7 +597,7 @@ resource "aws_lb" "app" {
 
   enable_deletion_protection = false # DEV environment
 
-  tags = merge(local.common_tags, {
+  tags = merge(local.module_tags, {
     Name = "${var.project_name}-nlb"
   })
 }
@@ -600,7 +613,7 @@ resource "aws_lb_listener" "app" {
     target_group_arn = aws_lb_target_group.app.arn
   }
 
-  tags = merge(local.common_tags, {
+  tags = merge(local.module_tags, {
     Name = "${var.project_name}-nlb-listener"
   })
 }
