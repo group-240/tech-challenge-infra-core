@@ -81,7 +81,7 @@ provider "helm" {
 # TAGS LOCAIS (mescla tags comuns + tags específicas deste módulo)
 # ==============================================================================
 locals {
-  module_tags = merge(local.module_tags, {
+  module_tags = merge(local.common_tags, {
     Component = "infrastructure-core"
   })
 }
