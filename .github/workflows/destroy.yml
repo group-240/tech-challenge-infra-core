@@ -1,0 +1,231 @@
+name: 🧹 Destroy Infrastructure - DANGER ZONE
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: 'Type "DESTROY" to confirm complete destruction'
+        required: true
+        type: string
+      force:
+        description: 'Force destroy even with errors'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  AWS_REGION: us-east-1
+  TF_VERSION: 1.5.0
+
+jobs:
+  validate-confirmation:
+    name: 🔐 Validate Destruction Request
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Confirmation
+        run: |
+          if [ "${{ inputs.confirmation }}" != "DESTROY" ]; then
+            echo "❌ Confirmation failed! You must type exactly 'DESTROY' to proceed."
+            exit 1
+          fi
+          echo "✅ Confirmation validated"
+
+  destroy-infrastructure:
+    name: 🗑️ Destroy Core Infrastructure
+    runs-on: ubuntu-latest
+    needs: validate-confirmation
+    
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: ⚙️ Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: 🔍 Terraform Init
+        run: terraform init
+        continue-on-error: ${{ inputs.force }}
+
+      - name: 📋 List Resources Before Destroy
+        run: |
+          echo "📊 Current Resources in State:"
+          terraform state list || echo "No state found"
+        continue-on-error: true
+
+      - name: 💥 Terraform Destroy
+        run: |
+          if [ "${{ inputs.force }}" == "true" ]; then
+            echo "⚠️ FORCE MODE: Will attempt to destroy with -auto-approve and continue on error"
+            terraform destroy -auto-approve || echo "Some resources failed to destroy"
+          else
+            echo "🗑️ STANDARD MODE: Destroying with -auto-approve"
+            terraform destroy -auto-approve
+          fi
+
+      - name: 🧹 Clean Up Load Balancer Controller (if exists)
+        if: always()
+        run: |
+          echo "🔍 Checking for AWS Load Balancer Controller resources..."
+          
+          # Delete LoadBalancer services
+          kubectl delete svc --all -n tech-challenge --ignore-not-found=true || true
+          
+          # Delete TargetGroupBindings
+          kubectl delete targetgroupbindings --all -n tech-challenge --ignore-not-found=true || true
+          
+          # Wait for Load Balancers to be deleted
+          sleep 30
+          
+          echo "✅ Manual cleanup completed"
+        continue-on-error: true
+
+      - name: 📊 Verify Destruction
+        if: always()
+        run: |
+          echo "🔍 Checking remaining resources..."
+          terraform state list || echo "✅ State is empty"
+          
+          echo ""
+          echo "🔍 Checking AWS resources manually..."
+          
+          # VPC
+          aws ec2 describe-vpcs --filters "Name=tag:Project,Values=tech-challenge" --query 'Vpcs[*].VpcId' || true
+          
+          # EKS
+          aws eks list-clusters --query 'clusters[?contains(@, `tech-challenge`)]' || true
+          
+          # Load Balancers
+          aws elbv2 describe-load-balancers --query 'LoadBalancers[?contains(LoadBalancerName, `tech-challenge`)].LoadBalancerArn' || true
+          
+          echo ""
+          echo "✅ Destruction verification complete"
+        continue-on-error: true
+
+      - name: 📝 Summary
+        if: always()
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "🧹 CORE INFRASTRUCTURE DESTRUCTION SUMMARY"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "Repository: tech-challenge-infra-core"
+          echo "Timestamp: $(date)"
+          echo "Force Mode: ${{ inputs.force }}"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+  destroy-bootstrap:
+    name: 🔥 Destroy Bootstrap (S3/DynamoDB)
+    runs-on: ubuntu-latest
+    needs: destroy-infrastructure
+    if: always()
+    
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: ⚙️ Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: 🗑️ Empty S3 Buckets
+        run: |
+          echo "🪣 Emptying S3 buckets..."
+          
+          BUCKETS=$(aws s3 ls | grep tech-challenge-tfstate | awk '{print $3}')
+          
+          for bucket in $BUCKETS; do
+            echo "Emptying bucket: $bucket"
+            aws s3 rm "s3://${bucket}" --recursive || true
+          done
+          
+          echo "✅ S3 buckets emptied"
+        continue-on-error: true
+
+      - name: 💥 Destroy Bootstrap Resources
+        run: |
+          cd bootstrap
+          
+          terraform init -reconfigure || true
+          
+          echo "📋 Bootstrap resources:"
+          terraform state list || echo "No state found"
+          
+          if [ "${{ inputs.force }}" == "true" ]; then
+            terraform destroy -auto-approve || echo "Some bootstrap resources failed to destroy"
+          else
+            terraform destroy -auto-approve
+          fi
+        continue-on-error: ${{ inputs.force }}
+
+      - name: 🧹 Force Delete Remaining Resources
+        if: inputs.force == true
+        run: |
+          echo "⚠️ FORCE MODE: Deleting remaining AWS resources..."
+          
+          # Delete S3 buckets
+          BUCKETS=$(aws s3 ls | grep tech-challenge | awk '{print $3}')
+          for bucket in $BUCKETS; do
+            echo "Force deleting bucket: $bucket"
+            aws s3 rb "s3://${bucket}" --force || true
+          done
+          
+          # Delete DynamoDB tables
+          TABLES=$(aws dynamodb list-tables --query "TableNames[?contains(@, 'tech-challenge')]" --output text)
+          for table in $TABLES; do
+            echo "Force deleting table: $table"
+            aws dynamodb delete-table --table-name "$table" || true
+          done
+          
+          echo "✅ Force cleanup completed"
+        continue-on-error: true
+
+      - name: 📊 Final Verification
+        if: always()
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "🔍 FINAL AWS RESOURCE CHECK"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          
+          echo ""
+          echo "S3 Buckets:"
+          aws s3 ls | grep tech-challenge || echo "✅ No tech-challenge buckets found"
+          
+          echo ""
+          echo "DynamoDB Tables:"
+          aws dynamodb list-tables --query "TableNames[?contains(@, 'tech-challenge')]" || echo "✅ No tech-challenge tables found"
+          
+          echo ""
+          echo "VPCs:"
+          aws ec2 describe-vpcs --filters "Name=tag:Project,Values=tech-challenge" --query 'Vpcs[*].[VpcId,Tags[?Key==`Name`].Value|[0]]' --output table || echo "✅ No VPCs found"
+          
+          echo ""
+          echo "EKS Clusters:"
+          aws eks list-clusters --query 'clusters[?contains(@, `tech-challenge`)]' || echo "✅ No clusters found"
+          
+          echo ""
+          echo "Load Balancers:"
+          aws elbv2 describe-load-balancers --query 'LoadBalancers[*].[LoadBalancerName,LoadBalancerArn]' --output table | grep tech-challenge || echo "✅ No load balancers found"
+          
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "✅ Destruction verification complete!"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        continue-on-error: true
