@@ -1,4 +1,4 @@
-# 🔄 Configurações Compartilhadas - Tech Challenge
+ # 🔄 Configurações Compartilhadas - Tech Challenge
 
 > **⚠️ ATENÇÃO**: Este arquivo lista todas as configurações que devem ser mantidas sincronizadas entre os repositórios. Qualquer mudança em uma dessas configurações deve ser aplicada em TODOS os repositórios afetados.
 

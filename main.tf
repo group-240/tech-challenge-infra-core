@@ -240,14 +240,14 @@ resource "aws_eks_node_group" "main" {
   ]
 }
 
-# AWS Load Balancer Controller addon para integração com NLB
-resource "aws_eks_addon" "aws_load_balancer_controller" {
+# EKS addon nativo - VPC CNI (gerenciamento de rede dos pods)
+resource "aws_eks_addon" "vpc_cni" {
   cluster_name  = aws_eks_cluster.main.name
-  addon_name    = "aws-load-balancer-controller"
-  #addon_version = "v2.11.0-eksbuild.1"
+  addon_name    = "vpc-cni"
+  # Versão será escolhida automaticamente pela AWS
   
   tags = merge(local.common_tags, {
-    Name = "${var.project_name}-alb-controller"
+    Name = "${var.project_name}-vpc-cni"
   })
 
   depends_on = [
@@ -255,14 +255,29 @@ resource "aws_eks_addon" "aws_load_balancer_controller" {
   ]
 }
 
-# EKS addon para VPC CNI
-resource "aws_eks_addon" "vpc_cni" {
+# EKS addon nativo - kube-proxy (proxy de rede Kubernetes)
+resource "aws_eks_addon" "kube_proxy" {
   cluster_name  = aws_eks_cluster.main.name
-  addon_name    = "vpc-cni"
-  #addon_version = "v1.19.0-eksbuild.1"
+  addon_name    = "kube-proxy"
+  # Versão será escolhida automaticamente pela AWS
   
   tags = merge(local.common_tags, {
-    Name = "${var.project_name}-vpc-cni"
+    Name = "${var.project_name}-kube-proxy"
+  })
+
+  depends_on = [
+    aws_eks_node_group.main
+  ]
+}
+
+# EKS addon nativo - CoreDNS (DNS interno do cluster)
+resource "aws_eks_addon" "coredns" {
+  cluster_name  = aws_eks_cluster.main.name
+  addon_name    = "coredns"
+  # Versão será escolhida automaticamente pela AWS
+  
+  tags = merge(local.common_tags, {
+    Name = "${var.project_name}-coredns"
   })
 
   depends_on = [
@@ -391,13 +406,13 @@ resource "aws_ecr_lifecycle_policy" "app" {
 # Network Load Balancer (NLB) - Infraestrutura compartilhada
 # ------------------------------------------------------------------
 
-# Target Group para o NLB (apontará para os pods da aplicação)
+# Target Group para o NLB (apontará para NodePort 30080 nos EC2 nodes)
 resource "aws_lb_target_group" "app" {
   name        = "${var.project_name}-app-tg"
-  port        = 80
+  port        = 30080  # NodePort do Kubernetes service
   protocol    = "TCP"
   vpc_id      = aws_vpc.main.id
-  target_type = "ip"
+  target_type = "instance"  # Aponta para os EC2 nodes, não IPs
 
   health_check {
     enabled             = true
@@ -405,8 +420,8 @@ resource "aws_lb_target_group" "app" {
     unhealthy_threshold = 2
     interval            = 30
     protocol            = "HTTP"
-    path                = "/api/health"
-    port                = "8080"
+    path                = "/actuator/health"
+    port                = "30080"  # Health check na NodePort
     timeout             = 10
   }
 
