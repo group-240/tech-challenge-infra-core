@@ -19,12 +19,12 @@ terraform {
     }
   }
 
-  # Backend S3 específico para sua conta AWS (891377164819)
+  # Backend S3 específico para sua conta AWS (variável definida em lab-config.tf)
   backend "s3" {
-    bucket         = "tech-challenge-tfstate-533267363894-4"
+    bucket         = "tech-challenge-tfstate-533267363894-10"  # Padrão: tech-challenge-tfstate-${local.aws_account_suffix}
     key            = "core/terraform.tfstate"
     region         = "us-east-1"
-    dynamodb_table = "tech-challenge-terraform-lock-533267363894"
+    dynamodb_table = "tech-challenge-terraform-lock-533267363894-10"  # Padrão: tech-challenge-terraform-lock-${local.aws_account_suffix}
     encrypt        = true
   }
 }

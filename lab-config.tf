@@ -4,8 +4,9 @@
 
 locals {
   # Configurações fixas da sua conta
-  aws_account_id = "533267363894"
-  aws_region     = "us-east-1"
+  aws_account_id     = "533267363894"
+  aws_account_suffix = "533267363894-10"  # Sufixo para recursos S3/DynamoDB
+  aws_region         = "us-east-1"
   
   # Role específico do Learner Lab
   lab_role_arn = "arn:aws:iam::${local.aws_account_id}:role/LabRole"
